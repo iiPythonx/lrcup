@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+dynamic = [
+    "version"
+]
+name = "lrcup"
+authors = [
+  { name = "iiPython", email = "ben@iipython.dev" },
+]
+description = "Python module and CLI for the LRCLIB API"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/iiPythonx/lrcup"
+Issues = "https://github.com/iiPythonx/lrcup/issues"
+
+[tool.hatch.version]
+path = "lrcup/__init__.py"
+
+[project.scripts]
+lrcup = "lrcup.__main__:main"
