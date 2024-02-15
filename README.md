@@ -1,6 +1,6 @@
 # LRCUP
 
-Python CLI and librayr for interacting with the [LRCLIB.net API](https://lrclib.net/).
+Python CLI and library for interacting with the [LRCLIB.net API](https://lrclib.net/).
 
 ## Installation
 
