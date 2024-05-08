@@ -104,6 +104,14 @@ def upload(filename: str) -> None:
 
     click.secho("\nUploaded to LRCLIB successfully.", fg = "green")
 
+@lrcup.command(help = "Embed an LRC file into an audio file")
+@click.argument("lrc")
+@click.argument("destination")
+def embed(lrc: str, destination: str) -> None:
+    file = mutagen.File(destination)
+    file["LYRICS"] = Path(lrc).read_text()
+    file.save()
+
 @lrcup.command(help = "Search for specific lyrics by query")
 @click.argument("query", nargs = -1, required = True)
 def search(query: str) -> None:

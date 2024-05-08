@@ -32,4 +32,4 @@ Issues = "https://github.com/iiPythonx/lrcup/issues"
 path = "lrcup/__init__.py"
 
 [project.scripts]
-lrcup = "lrcup.__main__:main"
+lrcup = "lrcup.__main__:lrcup"
