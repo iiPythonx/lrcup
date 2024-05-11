@@ -1,12 +1,12 @@
 # Copyright (c) 2024 iiPython
 
 # Modules
-import hashlib
 from typing import Any, List, Dict
 
 import requests
 
 from . import __version__
+from .challenge import solve
 
 # API Controller
 class LRCLib():
@@ -116,19 +116,5 @@ class LRCLib():
 
             return True
 
-        def solve_challenge(prefix: str, target: str) -> int:
-            nonce, target = 0, bytes.fromhex(target)
-            while True:
-                if verify_nonce(
-                    hashlib.sha256(f"{prefix}{nonce}".encode()).digest(),
-                    target
-                ):
-                    break
-
-                else:
-                    nonce += 1
-
-            return nonce
-
-        nonce = solve_challenge(data["prefix"], data["target"])
+        nonce = solve(data["prefix"], data["target"])
         return f"{data['prefix']}:{nonce}"
