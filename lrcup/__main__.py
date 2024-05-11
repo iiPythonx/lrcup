@@ -43,7 +43,7 @@ def upload(filename: str) -> None:
     def process_lyrics(lyrics: str) -> (str, str):
         if all([line.startswith("[") for line in lyrics.split("\n") if line.strip()]):
             print(t("LRC Status"), "\033[32msynced\033[0m", sep = "")
-            return None, lyrics
+            return "\n".join([line.split("]")[1].lstrip() for line in lyrics.split("\n") if line.strip()]), lyrics
 
         print(t("LRC Status"), "\033[31munsynced\033[0m", sep = "")
         return lyrics, None
