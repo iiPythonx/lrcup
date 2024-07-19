@@ -152,7 +152,8 @@ def version() -> None:
 
 @lrcup.command(help = "Automatically search and embed lyrics for a folder")
 @click.argument("target")
-def autoembed(target: str) -> None:
+@click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics")
+def autoembed(target: str, force: bool) -> None:
     target = Path(target)
     if not target.is_dir():
         return click.secho("Specified target is not a folder.", fg = "red")
@@ -164,7 +165,7 @@ def autoembed(target: str) -> None:
         try:
             data = mutagen.File(file)
             artist, album, title = data["ALBUMARTIST"][0], data["ALBUM"][0], data["TITLE"][0]
-            if not data.get("LYRICS"):
+            if data.get("LYRICS") and not force:
                 click.secho(f"[/] Skipping {title} on {album} by {artist}", fg = "yellow")
                 continue
 
@@ -174,7 +175,7 @@ def autoembed(target: str) -> None:
                 click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
                 continue
 
-            lyrics = results["syncedLyrics"] or results["plainLyrics"]
+            lyrics = (results.get("syncedLyrics") or results.get("plainLyrics")) or ""
             if not lyrics.strip():
                 click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
                 continue
@@ -184,8 +185,7 @@ def autoembed(target: str) -> None:
 
             click.secho(f"[+] Fetched lyrics for {title} on {album} by {artist}", fg = "green")
 
-        except Exception as e:
-            print(e)
+        except Exception:
             click.secho(f"[-] Failed to read tags from file '{file}'", fg = "red")
 
 if __name__ == "__main__":
