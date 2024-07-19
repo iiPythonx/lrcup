@@ -5,7 +5,9 @@ import sys
 from pathlib import Path
 
 import click
-import mutagen
+from mutagen.mp3 import MP3
+from mutagen.flac import FLAC
+from mutagen.easyid3 import EasyID3
 
 from . import __version__
 from .controller import LRCLib
@@ -28,6 +30,14 @@ def custom_input(prompt: str, value_format: str = None) -> str:
         update_previous(value_format.format(value), prompt)
 
     return value
+
+suffix_map = {".flac": FLAC, ".mp3": lambda x: MP3(x, ID3 = EasyID3)}
+def open_mutagen_file(file: Path) -> FLAC | MP3:
+    if file.suffix not in suffix_map:
+        click.secho(f"Unsupported file extension: '{file.suffix}'!", fg = "red")
+        exit(1)
+
+    return suffix_map[file.suffix](file)
 
 # Handle CLI
 @click.group()
@@ -57,8 +67,8 @@ def upload(filename: str) -> None:
         with filename.open() as fh:
             plain_lyrics, synced_lyrics = process_lyrics(fh.read())
 
-    elif filename.suffix in [".mp3", ".flac", ".ogg", ".`m4a"]:
-        lyrics = mutagen.File(filename)["lyrics"]
+    elif filename.suffix in suffix_map:
+        lyrics = open_mutagen_file(filename)["LYRICS"]
         if not lyrics:
             return print(t("LRC Status"), "\033[31mmissing\033[0m", sep = "")
 
@@ -108,7 +118,7 @@ def upload(filename: str) -> None:
 @click.argument("lrc")
 @click.argument("destination")
 def embed(lrc: str, destination: str) -> None:
-    file = mutagen.File(destination)
+    file = open_mutagen_file(destination)
     file["LYRICS"] = Path(lrc).read_text()
     file.save()
 
@@ -159,12 +169,12 @@ def autoembed(target: str, force: bool) -> None:
         return click.secho("Specified target is not a folder.", fg = "red")
 
     for file in target.rglob("*"):
-        if not (file.is_file() and file.suffix in [".flac", ".mp3", ".ogg", ".m4a"]):
+        if not (file.is_file() and file.suffix in suffix_map):
             continue
 
         try:
-            data = mutagen.File(file)
-            artist, album, title = data["ALBUMARTIST"][0], data["ALBUM"][0], data["TITLE"][0]
+            data = open_mutagen_file(file)
+            artist, album, title = (data["ALBUMARTIST"] or data["ARTIST"])[0], data["ALBUM"][0], data["TITLE"][0]
             if data.get("LYRICS") and not force:
                 click.secho(f"[/] Skipping {title} on {album} by {artist}", fg = "yellow")
                 continue
