@@ -150,5 +150,43 @@ def search(query: str) -> None:
 def version() -> None:
     click.echo(f"LRCUP v{__version__} (https://github.com/iiPythonx/lrcup)")
 
+@lrcup.command(help = "Automatically search and embed lyrics for a folder")
+@click.argument("target")
+def autoembed(target: str) -> None:
+    target = Path(target)
+    if not target.is_dir():
+        return click.secho("Specified target is not a folder.", fg = "red")
+
+    for file in target.rglob("*"):
+        if not (file.is_file() and file.suffix in [".flac", ".mp3", ".ogg", ".m4a"]):
+            continue
+
+        try:
+            data = mutagen.File(file)
+            artist, album, title = data["ALBUMARTIST"][0], data["ALBUM"][0], data["TITLE"][0]
+            if not data.get("LYRICS"):
+                click.secho(f"[/] Skipping {title} on {album} by {artist}", fg = "yellow")
+                continue
+
+            # Perform lyrics search
+            results = lrclib.get(title, artist, album, round(data.info.length))
+            if not results:
+                click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
+                continue
+
+            lyrics = results["syncedLyrics"] or results["plainLyrics"]
+            if not lyrics.strip():
+                click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
+                continue
+
+            data["LYRICS"] = lyrics
+            data.save()
+
+            click.secho(f"[+] Fetched lyrics for {title} on {album} by {artist}", fg = "green")
+
+        except Exception as e:
+            print(e)
+            click.secho(f"[-] Failed to read tags from file '{file}'", fg = "red")
+
 if __name__ == "__main__":
     lrcup()
