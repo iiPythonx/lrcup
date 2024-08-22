@@ -1,6 +1,7 @@
 # LRCUP
 
-Python CLI and library for interacting with the [LRCLIB.net API](https://lrclib.net/).
+Python CLI and library for interacting with the [LRCLIB.net API](https://lrclib.net/).  
+Also includes tools for embedding lyrics, along with general LRC tools.
 
 ## Installation
 
@@ -11,12 +12,21 @@ pip install lrcup
 
 ## CLI Usage
 
-```py
-# If you have an unsynced/synced LRC file:
+```sh
+# Upload a synced/unsynced LRC file:
 lrcup upload example.lrc
 
-# If you have a track with embedded lyrics:
+# Upload lyrics from an already embedded track:
 lrcup upload file.flac
+
+# Embed lyrics into a file:
+lrcup embed lyrics.lrc track.flac
+
+# Search for lyrics and download them:
+lrcup search never gonna give you up
+
+# Search and embed lyrics for a given folder:
+lrcup autoembed /mnt/music/
 ```
 
 ## Module Usage
@@ -29,10 +39,31 @@ from lrcup import LRCLib
 
 lrclib = LRCLib()
 
-# Example of getting synced lyrics via search
+# Fetch synced lyrics via search
 results = lrclib.search(
-    track = "Never gonna give you up",
+    track = "Never Gonna Give You Up",
     artist = "Rick Astley"
 )
 print(results[0]["syncedLyrics"])
+
+# Fetch synced lyrics directly
+track = lrclib.get(
+    track = "Never Gonna Give You Up",
+    artist = "Rick Astley",
+    album = "Whenever You Need Somebody",
+    duration = 215
+)
+if track is not None:
+    print(track["syncedLyrics"])
+
+# Publish synced lyrics
+lrclib.publish(
+    token = lrclib.request_challenge(),
+    track = "Never Gonna Give You Up",
+    artist = "Rick Astley",
+    album = "Whenever You Need Somebody",
+    duration = 215,
+    plain_lyrics = "*Rickrolling*",
+    synced_lyrics = "[00:00.00] *Rickrolling*"
+)
 ```

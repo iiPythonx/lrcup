@@ -11,16 +11,15 @@ from .challenge import solve
 # API Controller
 class LRCLib():
     def __init__(self, api_url: str = "https://lrclib.net/api/") -> None:
-        self.api_url = api_url
-        if not self.api_url.endswith("/"):
-            self.api_url += "/"
+        self.session = requests.Session()
+        self.api_url = f"{api_url.rstrip('/')}/"
 
     def request(self, method: str, endpoint: str, headers: dict = {}, **kwargs) -> requests.Response:
         headers = {
             "User-Agent": f"LRCUP v{__version__} (https://github.com/iiPythonx/lrcup)",
             **headers
         }
-        return getattr(requests, method)(
+        return getattr(self.session, method)(
             self.api_url + endpoint,
             headers = headers,
             **kwargs
@@ -32,10 +31,10 @@ class LRCLib():
 
     def search(
         self,
-        query: str = None,
-        track: str = None,
-        artist: str = None,
-        album: str = None
+        query: str | None = None,
+        track: str | None = None,
+        artist: str | None = None,
+        album: str | None = None
     ) -> List[Dict[str, Any]]:
         return self.request("get", "search", params = {
             "q": query,

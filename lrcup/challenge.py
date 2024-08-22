@@ -8,10 +8,10 @@ import threading
 # Solution class
 class Solution:
     def __init__(self) -> None:
-        self.nonce = None
+        self.nonce: int = 0
 
     def is_solved(self) -> bool:
-        return self.nonce is not None
+        return self.nonce != 0
 
 def is_nonce_valid(prefix: str, nonce: int, target: bytes) -> bool:
     hash_value = hashlib.sha256(f"{prefix}{nonce}".encode()).digest()
@@ -35,11 +35,11 @@ def find_nonce(
     return solution
 
 def solve(prefix: str, target: str) -> int:
-    target, solution, threads = bytes.fromhex(target), Solution(), []
+    target_bytes, solution, threads = bytes.fromhex(target), Solution(), []
     for i in range(4):
         threads.append(threading.Thread(
             target = find_nonce,
-            args = (prefix, target, solution, i, 4),
+            args = (prefix, target_bytes, solution, i, 4),
         ))
 
     [t.start() for t in threads]
