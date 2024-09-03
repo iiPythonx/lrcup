@@ -7,7 +7,6 @@ from pathlib import Path
 import click
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
-from mutagen.easyid3 import EasyID3
 
 from . import __version__
 from .controller import LRCLib
@@ -24,20 +23,31 @@ lrclib = LRCLib()
 def update_previous(value: str, prompt: str) -> None:
     print(f"\033[1F\033[2K{prompt}{value}")
 
-def custom_input(prompt: str, value_format: str = None) -> str:
+def custom_input(prompt: str, value_format: str | None = None) -> str:
     value = input(prompt)
     if value_format is not None:
         update_previous(value_format.format(value), prompt)
 
     return value
 
-suffix_map = {".flac": FLAC, ".mp3": lambda x: MP3(x, ID3 = EasyID3)}
+suffix_map = {".flac": FLAC, ".mp3": lambda x: MP3(x)}
 def open_mutagen_file(file: Path) -> FLAC | MP3:
     if file.suffix not in suffix_map:
         click.secho(f"Unsupported file extension: '{file.suffix}'!", fg = "red")
         exit(1)
 
     return suffix_map[file.suffix](file)
+
+def get_lyrics_field_name(file: Path) -> str | None:
+    metadata = open_mutagen_file(file)
+    if isinstance(metadata, FLAC):
+        return "LYRICS"
+
+    # MP3 file
+    # Find the first USLT::* or SYLT::* field we see
+    # This ignores language and other details
+    options = [name for name in metadata if name[:4] in ["USLT", "SYLT"]]
+    return options[0] if options else None
 
 # Handle CLI
 @click.group()
@@ -49,8 +59,8 @@ def lrcup() -> None:
 
 @lrcup.command(help = "Upload lyrics to LRCLIB from local file")
 @click.argument("filename")
-def upload(filename: str) -> None:
-    def process_lyrics(lyrics: str) -> (str, str):
+def upload(filename: Path) -> None:
+    def process_lyrics(lyrics: str) -> tuple[str, str | None]:
         if all([line.startswith("[") for line in lyrics.split("\n") if line.strip()]):
             print(t("LRC Status"), "\033[32msynced\033[0m", sep = "")
             return "\n".join([line.split("]")[1].lstrip() for line in lyrics.split("\n") if line.strip()]), lyrics
@@ -68,7 +78,7 @@ def upload(filename: str) -> None:
             plain_lyrics, synced_lyrics = process_lyrics(fh.read())
 
     elif filename.suffix in suffix_map:
-        lyrics = open_mutagen_file(filename)["LYRICS"]
+        lyrics = str(open_mutagen_file(filename)[get_lyrics_field_name(filename)])
         if not lyrics:
             return print(t("LRC Status"), "\033[31mmissing\033[0m", sep = "")
 
@@ -117,9 +127,9 @@ def upload(filename: str) -> None:
 @lrcup.command(help = "Embed an LRC file into an audio file")
 @click.argument("lrc")
 @click.argument("destination")
-def embed(lrc: str, destination: str) -> None:
+def embed(lrc: str, destination: Path) -> None:
     file = open_mutagen_file(destination)
-    file["LYRICS"] = Path(lrc).read_text()
+    file[get_lyrics_field_name(destination)] = Path(lrc).read_text()
     file.save()
 
 @lrcup.command(help = "Search for specific lyrics by query")
@@ -190,7 +200,7 @@ def autoembed(target: str, force: bool) -> None:
                 click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
                 continue
 
-            data["LYRICS"] = lyrics
+            data[get_lyrics_field_name(file)] = lyrics
             data.save()
 
             click.secho(f"[+] Fetched lyrics for {title} on {album} by {artist}", fg = "green")
