@@ -76,7 +76,7 @@ class AudioFile():
                 for (text, time) in lyrics.text  # type: ignore
             ])
 
-        return lyrics
+        return str(lyrics) if lyrics else None
 
     def set_lyrics(self, state: Literal["synced"] | Literal["unsynced"], lyrics: str | list, language: str = "XXX") -> None:
         if isinstance(self.file, FLAC):

@@ -38,8 +38,8 @@ def lrcup() -> None:
     pass
 
 @lrcup.command(help = "Upload lyrics to LRCLIB from local file")
-@click.argument("filename")
-def upload(filename: Path) -> None:
+@click.argument("file", type = click.Path(exists = True, dir_okay = False, path_type = Path))
+def upload(file: Path) -> None:
     def process_lyrics(lyrics: str) -> tuple[str, str | None]:
         if all([line.startswith("[") for line in lyrics.split("\n") if line.strip()]):
             print(t("LRC Status"), "\033[32msynced\033[0m", sep = "")
@@ -48,17 +48,16 @@ def upload(filename: Path) -> None:
         print(t("LRC Status"), "\033[31munsynced\033[0m", sep = "")
         return lyrics, None
 
-    filename = Path(filename).resolve()
-    if not filename.is_file():
-        return click.secho("Specified filename does not exist.", fg = "red")
+    metadata = None
 
     # Load lyrics format
-    if filename.suffix in [".txt", ".lrc"]:
-        plain_lyrics, synced_lyrics = process_lyrics(filename.read_text())
+    if file.suffix in [".txt", ".lrc"]:
+        plain_lyrics, synced_lyrics = process_lyrics(file.read_text())
 
     else:
         try:
-            lyrics = AudioFile(filename).get_lyrics()
+            metadata = AudioFile(file)
+            lyrics = metadata.get_lyrics()
             if not lyrics:
                 return print(t("LRC Status"), "\033[31mmissing\033[0m", sep = "")
 
@@ -68,21 +67,36 @@ def upload(filename: Path) -> None:
             return click.secho(e, fg = "red")
 
     # Ask every question known to man
-    track = custom_input(t("Track title"), GREEN_FMT)
-    artist = custom_input(t("Artist"), GREEN_FMT)
-    album = custom_input(t("Album") + f"({track}) ", GREEN_FMT) or track
-    update_previous(GREEN_FMT.format(album), t("Album"))
+    payload = {}
+    for field, readable in [("TITLE", "Track title"), ("ARTIST", "Artist"), ("ALBUM", ("Album", "({TITLE}) "))]:
+        addition = ""
+        if isinstance(readable, tuple):
+            readable, addition = readable
+
+        payload[field] = metadata and metadata.get_tag(field)
+        if not payload[field]:  # Catch empty fields as well
+            payload[field] = custom_input(t(readable) + addition.format(**payload), GREEN_FMT)
+            if field == "ALBUM":
+                payload[field] = payload[field] or payload["TITLE"]
+                update_previous(GREEN_FMT.format(payload[field]), t(readable))
+
+        else:
+            print(t(readable), GREEN_FMT.format(payload[field]), sep = "")
 
     # Take care of duration
-    duration = custom_input(t("Duration") + "(M:S or S) ", GREEN_FMT)
-    if ":" in duration:
-        duration = duration.split(":")
-        duration = (int(duration[0]) * 60) + int(duration[1])
+    if metadata is None:
+        duration = custom_input(t("Duration") + "(M:S or S) ", GREEN_FMT)
+        if ":" in duration:
+            duration = duration.split(":")
+            duration = (int(duration[0]) * 60) + int(duration[1])
+
+        else:
+            duration = int(duration)
+
+        update_previous(GREEN_FMT.format(f"{duration} second(s)"), t("Duration"))
 
     else:
-        duration = int(duration)
-
-    update_previous(GREEN_FMT.format(f"{duration} second(s)"), t("Duration"))
+        duration = metadata.length
 
     # Confirmation
     if "-y" not in sys.argv:
@@ -92,9 +106,9 @@ def upload(filename: Path) -> None:
     # Upload to LRCLIB
     success = lrclib.publish(
         lrclib.request_challenge(),
-        track,
-        artist,
-        album,
+        payload["TITLE"],
+        payload["ARTIST"],
+        payload["ALBUM"],
         duration,
         plain_lyrics or "",
         synced_lyrics or ""
