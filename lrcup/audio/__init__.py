@@ -72,7 +72,7 @@ class AudioFile():
             lyrics = "\n".join([
 
                 # This is absolute garbage and I'll replace it eventually
-                f"[{str(math.floor(time / 60000)).zfill(2)}:{str(time / 1000).split(".")[0].zfill(2)}.{str(time / 1000).split(".")[1].zfill(2)}] {text}"
+                f"[{str(math.floor(time / 60000)).zfill(2)}:{str(time / 1000).split('.')[0].zfill(2)}.{str(time / 1000).split('.')[1].zfill(2)}] {text}"
                 for (text, time) in lyrics.text  # type: ignore
             ])
 
