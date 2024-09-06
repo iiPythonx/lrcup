@@ -3,7 +3,7 @@ on:
   push:
 
     # This is temporary, I don't want to use GH Releases rn
-    paths: ["lrcup/__init__.py"]
+    paths: ["lrcup/__init__.py", "pyproject.toml"]
 
   workflow_dispatch:
 
