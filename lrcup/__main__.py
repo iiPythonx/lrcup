@@ -5,10 +5,9 @@ import sys
 from pathlib import Path
 
 import click
-from mutagen.mp3 import MP3
-from mutagen.flac import FLAC
 
 from . import __version__
+from .audio import AudioFile, UnsupportedSuffix, CLASS_MAPPING, format_lyrics
 from .controller import LRCLib
 
 # Initialization
@@ -30,25 +29,6 @@ def custom_input(prompt: str, value_format: str | None = None) -> str:
 
     return value
 
-suffix_map = {".flac": FLAC, ".mp3": lambda x: MP3(x)}
-def open_mutagen_file(file: Path) -> FLAC | MP3:
-    if file.suffix not in suffix_map:
-        click.secho(f"Unsupported file extension: '{file.suffix}'!", fg = "red")
-        exit(1)
-
-    return suffix_map[file.suffix](file)
-
-def get_lyrics_field_name(file: Path) -> str | None:
-    metadata = open_mutagen_file(file)
-    if isinstance(metadata, FLAC):
-        return "LYRICS"
-
-    # MP3 file
-    # Find the first USLT::* or SYLT::* field we see
-    # This ignores language and other details
-    options = [name for name in metadata if name[:4] in ["USLT", "SYLT"]]
-    return options[0] if options else None
-
 # Handle CLI
 @click.group()
 def lrcup() -> None:
@@ -63,7 +43,7 @@ def upload(filename: Path) -> None:
     def process_lyrics(lyrics: str) -> tuple[str, str | None]:
         if all([line.startswith("[") for line in lyrics.split("\n") if line.strip()]):
             print(t("LRC Status"), "\033[32msynced\033[0m", sep = "")
-            return "\n".join([line.split("]")[1].lstrip() for line in lyrics.split("\n") if line.strip()]), lyrics
+            return "\n".join([line.split("]")[1].lstrip() for line in lyrics.split("\n") if line.strip()]), format_lyrics(lyrics)
 
         print(t("LRC Status"), "\033[31munsynced\033[0m", sep = "")
         return lyrics, None
@@ -74,18 +54,18 @@ def upload(filename: Path) -> None:
 
     # Load lyrics format
     if filename.suffix in [".txt", ".lrc"]:
-        with filename.open() as fh:
-            plain_lyrics, synced_lyrics = process_lyrics(fh.read())
-
-    elif filename.suffix in suffix_map:
-        lyrics = str(open_mutagen_file(filename)[get_lyrics_field_name(filename)])
-        if not lyrics:
-            return print(t("LRC Status"), "\033[31mmissing\033[0m", sep = "")
-
-        plain_lyrics, synced_lyrics = process_lyrics(lyrics)
+        plain_lyrics, synced_lyrics = process_lyrics(filename.read_text())
 
     else:
-        return click.secho(f"Unsupported file extension for file '{filename.name}'.", fg = "red")
+        try:
+            lyrics = AudioFile(filename).get_lyrics()
+            if not lyrics:
+                return print(t("LRC Status"), "\033[31mmissing\033[0m", sep = "")
+
+            plain_lyrics, synced_lyrics = process_lyrics(lyrics)
+
+        except UnsupportedSuffix as e:
+            return click.secho(e, fg = "red")
 
     # Ask every question known to man
     track = custom_input(t("Track title"), GREEN_FMT)
@@ -116,8 +96,8 @@ def upload(filename: Path) -> None:
         artist,
         album,
         duration,
-        plain_lyrics,
-        synced_lyrics
+        plain_lyrics or "",
+        synced_lyrics or ""
     )
     if not success:
         return click.secho("\nFailed to upload to LRCLIB.", fg = "red")
@@ -128,9 +108,8 @@ def upload(filename: Path) -> None:
 @click.argument("lrc")
 @click.argument("destination")
 def embed(lrc: str, destination: Path) -> None:
-    file = open_mutagen_file(destination)
-    file[get_lyrics_field_name(destination)] = Path(lrc).read_text()
-    file.save()
+    lyrics = Path(lrc).read_text()
+    AudioFile(destination).set_lyrics("synced" if "[" in lyrics else "unsynced", lyrics)
 
 @lrcup.command(help = "Search for specific lyrics by query")
 @click.argument("query", nargs = -1, required = True)
@@ -173,24 +152,31 @@ def version() -> None:
 @lrcup.command(help = "Automatically search and embed lyrics for a folder")
 @click.argument("target")
 @click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics")
-def autoembed(target: str, force: bool) -> None:
+def autoembed(target: Path, force: bool) -> None:
     target = Path(target)
     if not target.is_dir():
         return click.secho("Specified target is not a folder.", fg = "red")
 
     for file in target.rglob("*"):
-        if not (file.is_file() and file.suffix in suffix_map):
+        if not (file.is_file() and file.suffix in CLASS_MAPPING):
             continue
 
         try:
-            data = open_mutagen_file(file)
-            artist, album, title = (data["ALBUMARTIST"] or data["ARTIST"])[0], data["ALBUM"][0], data["TITLE"][0]
-            if data.get("LYRICS") and not force:
+            data = AudioFile(file)
+            artist, album, title = data.get_tag("ALBUMARTIST") or data.get_tag("ARTIST"), \
+                data.get_tag("ALBUM"), data.get_tag("TITLE")
+
+            # I would use all() here but Ruff won't stop complaining
+            if not (artist and album and title):
+                click.secho(f"[/] Skipping {file} due to missing tags.", fg = "yellow")
+                continue
+
+            if data.get_lyrics() and not force:
                 click.secho(f"[/] Skipping {title} on {album} by {artist}", fg = "yellow")
                 continue
 
             # Perform lyrics search
-            results = lrclib.get(title, artist, album, round(data.info.length))
+            results = lrclib.get(title, artist, album, round(data.length))
             if not results:
                 click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
                 continue
@@ -200,9 +186,7 @@ def autoembed(target: str, force: bool) -> None:
                 click.secho(f"[-] No results found for {title} on {album} by {artist}", fg = "red")
                 continue
 
-            data[get_lyrics_field_name(file)] = lyrics
-            data.save()
-
+            data.set_lyrics("synced" if "[" in lyrics else "unsynced", lyrics)
             click.secho(f"[+] Fetched lyrics for {title} on {album} by {artist}", fg = "green")
 
         except Exception:
