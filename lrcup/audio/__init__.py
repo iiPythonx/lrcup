@@ -41,7 +41,7 @@ class AudioFile():
             tag = TAG_MAPPING.get(tag, tag)
 
         if tag in self.file:
-            return self.file[tag][0] if isinstance(self.file[tag], list) else self.file[tag]
+            return self.file[tag][0] if isinstance(self.file[tag], list) else str(self.file[tag])
 
     def set_tag(self, tag: str, value: str) -> None:
         if isinstance(self.file, MP3):
