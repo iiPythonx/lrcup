@@ -36,12 +36,16 @@ class AudioFile():
         self.file = CLASS_MAPPING[path.suffix](path)
         self.length = self.file.info.length
 
-    def get_tag(self, tag: str) -> str | None:
+    def __repr__(self) -> str:
+        return f"<AudioFile '{self.path}' length={round(self.length)} fields={len(self.file)} />"
+
+    def get_tag(self, tag: str, as_string: bool = True) -> str | None:
         if isinstance(self.file, MP3):
             tag = TAG_MAPPING.get(tag, tag)
 
         if tag in self.file:
-            return self.file[tag][0] if isinstance(self.file[tag], list) else str(self.file[tag])
+            field = self.file[tag]
+            return field[0] if isinstance(field, list) else (str(field) if as_string else field)
 
     def set_tag(self, tag: str, value: str) -> None:
         if isinstance(self.file, MP3):
@@ -56,7 +60,7 @@ class AudioFile():
 
         lyrics = None
         if language is not None:
-            lyrics = self.get_tag(f"USLT::{language}") or self.get_tag(f"SYLT::{language}")
+            lyrics = self.get_tag(f"USLT::{language}", False) or self.get_tag(f"SYLT::{language}", False)
 
         else:
 
@@ -69,12 +73,14 @@ class AudioFile():
             lyrics = lyrics[0] if lyrics else None
     
         if isinstance(lyrics, SYLT):
-            lyrics = "\n".join([
+            converted = []
+            for text, time in lyrics.text:
+                minutes = math.floor(time / 60000)
+                seconds = math.floor((time / 1000) - (minutes * 60))
+                millisc = time - (minutes * 60000) - (seconds * 1000)
+                converted.append(f"[{str(minutes).zfill(2)}:{str(seconds).zfill(2)}.{str(millisc).rstrip('0').ljust(2, '0')}] {text}")
 
-                # This is absolute garbage and I'll replace it eventually
-                f"[{str(math.floor(time / 60000)).zfill(2)}:{str(time / 1000).split('.')[0].zfill(2)}.{str(time / 1000).split('.')[1].zfill(2)}] {text}"
-                for (text, time) in lyrics.text  # type: ignore
-            ])
+            lyrics = "\n".join(converted)
 
         return str(lyrics) if lyrics else None
 
