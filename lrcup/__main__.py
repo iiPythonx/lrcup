@@ -119,10 +119,10 @@ def upload(file: Path) -> None:
     click.secho("\nUploaded to LRCLIB successfully.", fg = "green")
 
 @lrcup.command(help = "Embed an LRC file into an audio file")
-@click.argument("lrc")
-@click.argument("destination")
-def embed(lrc: str, destination: Path) -> None:
-    lyrics = Path(lrc).read_text()
+@click.argument("lrc", type = click.Path(exists = True, dir_okay = False, path_type = Path))
+@click.argument("destination", type = click.Path(exists = True, dir_okay = False, path_type = Path))
+def embed(lrc: Path, destination: Path) -> None:
+    lyrics = lrc.read_text()
     AudioFile(destination).set_lyrics("synced" if "[" in lyrics else "unsynced", lyrics)
 
 @lrcup.command(help = "Search for specific lyrics by query")
@@ -164,13 +164,9 @@ def version() -> None:
     click.echo(f"LRCUP v{__version__} (https://github.com/iiPythonx/lrcup)")
 
 @lrcup.command(help = "Automatically search and embed lyrics for a folder")
-@click.argument("target")
+@click.argument("target", type = click.Path(exists = True, file_okay = False, path_type = Path))
 @click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics")
 def autoembed(target: Path, force: bool) -> None:
-    target = Path(target)
-    if not target.is_dir():
-        return click.secho("Specified target is not a folder.", fg = "red")
-
     for file in target.rglob("*"):
         if not (file.is_file() and file.suffix in CLASS_MAPPING):
             continue
