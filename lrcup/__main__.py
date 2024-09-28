@@ -52,7 +52,7 @@ def upload(file: Path) -> None:
 
     # Load lyrics format
     if file.suffix in [".txt", ".lrc"]:
-        plain_lyrics, synced_lyrics = process_lyrics(file.read_text())
+        plain_lyrics, synced_lyrics = process_lyrics(file.read_text(encoding = "utf-8"))
 
     else:
         try:
@@ -122,7 +122,7 @@ def upload(file: Path) -> None:
 @click.argument("lrc", type = click.Path(exists = True, dir_okay = False, path_type = Path))
 @click.argument("destination", type = click.Path(exists = True, dir_okay = False, path_type = Path))
 def embed(lrc: Path, destination: Path) -> None:
-    lyrics = lrc.read_text()
+    lyrics = lrc.read_text(encoding = "utf-8")
     AudioFile(destination).set_lyrics("synced" if "[" in lyrics else "unsynced", lyrics)
 
 @lrcup.command(help = "Search for specific lyrics by query")
