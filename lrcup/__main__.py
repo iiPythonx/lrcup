@@ -202,5 +202,65 @@ def autoembed(target: Path, force: bool) -> None:
         except Exception:
             click.secho(f"[-] Failed to read tags from file '{file}'", fg = "red")
 
+@lrcup.command(
+    help = "Apply a time offset to a specified LRC file or audio file.",
+    context_settings = {"ignore_unknown_options": True}
+)
+@click.argument("target", type = click.Path(exists = True, dir_okay = False, path_type = Path))
+@click.argument("offset")
+def offset(target: Path, offset: str) -> None:
+
+    # Check offset
+    offset_direction = offset[0]
+    if offset_direction not in ["+", "-"]:
+        return click.secho("Invalid offset specified, must start with + or -.", fg = "red")
+
+    offset, offset_parts = offset[1:], {}
+    for timeframe in ["minutes", "seconds"]:
+        try:
+            split_items = offset.split(timeframe[0])
+            if len(split_items) == 1:
+                offset_parts[timeframe] = 0
+                continue
+
+            offset_parts[timeframe], offset = float(split_items[0]), split_items[1]
+
+        except ValueError:
+            return click.secho(f"Invalid offset specified, failed to convert {timeframe} to a float.", fg = "red")
+
+    # Load file content
+    try:
+        file = AudioFile(target)
+        lyrics = file.get_lyrics()
+        if lyrics is None:
+            return click.secho("Specified audio file does not have lyrics.", fg = "red")
+
+        if "[" not in lyrics:
+            return click.secho("Specified file has unsynced lyrics, not synced lyrics.", fg = "red")
+
+    except UnsupportedSuffix:
+        file, lyrics = target, target.read_text()
+
+    lyrics = [
+        [time, lyric]
+        for lyric, time in AudioFile.parse_lyrics(lyrics)
+    ]
+
+    # Perform offset
+    offset_int = (offset_parts["minutes"] * 60000) + (offset_parts["seconds"] * 1000) * (1 if offset_direction == "+" else -1)
+    if lyrics[0][0] + offset_int < 0:
+        return click.secho("Specified offset makes lyrics go out of range.", fg = "red")
+
+    lyrics = [(lyric, int(time + offset_int)) for time, lyric in lyrics]
+
+    # Reconstruct lyrics
+    if isinstance(file, AudioFile):
+        file.set_lyrics("synced", file.dump_lyrics(lyrics))
+
+    else:
+        file.write_text(AudioFile.dump_lyrics(lyrics))
+
+    click.secho("Applied offset successfully.", fg = "green")
+
 if __name__ == "__main__":
     lrcup()

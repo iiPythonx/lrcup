@@ -39,6 +39,29 @@ class AudioFile():
     def __repr__(self) -> str:
         return f"<AudioFile '{self.path}' length={round(self.length)} fields={len(self.file)} />"
 
+    @staticmethod
+    def parse_lyrics(lyrics: str) -> list[tuple[str, int]]:
+        new_lyrics = []
+        for line in lyrics.split("\n"):
+            if not line.strip():
+                continue
+
+            time, text = re.findall(SYNCED_EXPR, line)[0]
+            new_lyrics.append((text.strip(), int((60000 * int(time[:2])) + (1000 * float(time[3:])))))
+
+        return new_lyrics
+
+    @staticmethod
+    def dump_lyrics(lyrics: list[tuple[str, int]]) -> str:
+        converted = []
+        for text, time in lyrics:
+            minutes = math.floor(time / 60000)
+            seconds = math.floor((time / 1000) - (minutes * 60))
+            millisc = time - (minutes * 60000) - (seconds * 1000)
+            converted.append(f"[{str(minutes).zfill(2)}:{str(seconds).zfill(2)}.{str(millisc).rstrip('0').ljust(2, '0')}] {text}")
+
+        return "\n".join(converted)
+
     def get_tag(self, tag: str, as_string: bool = True) -> str | None:
         if isinstance(self.file, MP3):
             tag = TAG_MAPPING.get(tag, tag)
@@ -73,14 +96,7 @@ class AudioFile():
             lyrics = lyrics[0] if lyrics else None
     
         if isinstance(lyrics, SYLT):
-            converted = []
-            for text, time in lyrics.text:
-                minutes = math.floor(time / 60000)
-                seconds = math.floor((time / 1000) - (minutes * 60))
-                millisc = time - (minutes * 60000) - (seconds * 1000)
-                converted.append(f"[{str(minutes).zfill(2)}:{str(seconds).zfill(2)}.{str(millisc).rstrip('0').ljust(2, '0')}] {text}")
-
-            lyrics = "\n".join(converted)
+            lyrics = self.dump_lyrics(lyrics.text)  # type: ignore
 
         return str(lyrics) if lyrics else None
 
@@ -92,15 +108,7 @@ class AudioFile():
             return self.set_tag("LYRICS", lyrics)
 
         if state == "synced" and isinstance(lyrics, str):
-            new_lyrics = []
-            for line in lyrics.split("\n"):
-                if not line.strip():
-                    continue
-
-                time, text = re.findall(SYNCED_EXPR, line)[0]
-                new_lyrics.append((text.strip(), int((60000 * int(time[:2])) + (1000 * float(time[3:])))))
-
-            lyrics = new_lyrics
+            lyrics = self.parse_lyrics(lyrics)
 
         arguments = {"lang": language, "text": lyrics}
         if state == "synced":
