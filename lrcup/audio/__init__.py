@@ -26,7 +26,7 @@ TAG_MAPPING = {
         "ARTIST": "TPE1",
         "ALBUMARTIST": "TPE2"
     },
-    "m4a": {
+    "m4a": { # reference: https://mutagen.readthedocs.io/en/latest/api/mp4.html#mutagen.mp4.MP4Tags
         "TITLE": "\xa9nam",
         "ALBUM": "\xa9alb",
         "ARTIST": "\xa9ART",
