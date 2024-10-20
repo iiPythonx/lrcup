@@ -20,13 +20,13 @@ CLASS_MAPPING = {
 
 # Tag Mapping based on FileType
 TAG_MAPPING = {
-    "mp3": {
+    MP3: {
         "TITLE": "TIT2",
         "ALBUM": "TALB",
         "ARTIST": "TPE1",
         "ALBUMARTIST": "TPE2"
     },
-    "m4a": { # reference: https://mutagen.readthedocs.io/en/latest/api/mp4.html#mutagen.mp4.MP4Tags
+    MP4: { # reference: https://mutagen.readthedocs.io/en/latest/api/mp4.html#mutagen.mp4.MP4Tags
         "TITLE": "\xa9nam",
         "ALBUM": "\xa9alb",
         "ARTIST": "\xa9ART",
@@ -48,7 +48,8 @@ class AudioFile():
         if path.suffix not in CLASS_MAPPING:
             raise UnsupportedSuffix(f"Unsupported file extension: '{path.suffix}'!")
 
-        self.file = CLASS_MAPPING[path.suffix](path)
+        self.type = CLASS_MAPPING[path.suffix]
+        self.file = self.type(path)
         self.length = self.file.info.length
 
     def __repr__(self) -> str:
@@ -78,32 +79,23 @@ class AudioFile():
         return "\n".join(converted)
 
     def get_tag(self, tag: str, as_string: bool = True) -> str | None:
-        if isinstance(self.file, MP3):
-            tag = TAG_MAPPING["mp3"].get(tag, tag)
-
-        if isinstance(self.file, MP4):
-            tag = TAG_MAPPING["m4a"].get(tag, tag)
+        if self.type in TAG_MAPPING:
+            tag = TAG_MAPPING[self.type].get(tag, tag)
 
         if tag in self.file:
             field = self.file[tag]
             return field[0] if isinstance(field, list) else (str(field) if as_string else field)
 
     def set_tag(self, tag: str, value: str) -> None:
-        if isinstance(self.file, MP3):
-            tag = TAG_MAPPING["mp3"].get(tag, tag)
-
-        if isinstance(self.file, MP4):
-            tag = TAG_MAPPING["m4a"].get(tag, tag)
+        if self.type in TAG_MAPPING:
+            tag = TAG_MAPPING[self.type].get(tag, tag)
 
         self.file[tag] = value
         self.file.save()
 
     def get_lyrics(self, language: str | None = None) -> str | None:
-        if isinstance(self.file, FLAC):
-            return self.get_tag("LYRICS")
-
-        if isinstance(self.file, MP4):
-            return self.get_tag("\xa9lyr")
+        if self.type in [FLAC, MP4]:
+            return self.get_tag("LYRICS" if self.type == FLAC else "\xa9lyr")
 
         lyrics = None
         if language is not None:
@@ -125,14 +117,11 @@ class AudioFile():
         return str(lyrics) if lyrics else None
 
     def set_lyrics(self, state: Literal["synced"] | Literal["unsynced"], lyrics: str | list, language: str = "XXX") -> None:
-        if isinstance(self.file, FLAC):
+        if self.type in [FLAC, MP4]:
             if isinstance(lyrics, list):
                 raise ValueError
 
-            return self.set_tag("LYRICS", lyrics)
-
-        if isinstance(self.file, MP4):
-            return self.set_tag("\xa9lyr", lyrics)
+            return self.set_tag("LYRICS" if self.type == FLAC else "\xa9lyr", lyrics)
 
         if state == "synced" and isinstance(lyrics, str):
             lyrics = self.parse_lyrics(lyrics)
