@@ -8,18 +8,33 @@ from typing import Literal
 
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
+from mutagen.mp4 import MP4
 from mutagen.id3._frames import USLT, SYLT
 
 # Initialization
 CLASS_MAPPING = {
-    ".mp3": MP3, ".flac": FLAC
+    ".mp3": MP3,
+    ".flac": FLAC,
+    ".m4a": MP4
 }
+
+# Tag Mapping based on FileType
 TAG_MAPPING = {
-    "TITLE": "TIT2",
-    "ALBUM": "TALB",
-    "ARTIST": "TPE1",
-    "ALBUMARTIST": "TPE2"
+    "mp3": {
+        "TITLE": "TIT2",
+        "ALBUM": "TALB",
+        "ARTIST": "TPE1",
+        "ALBUMARTIST": "TPE2"
+    },
+    "m4a": { # reference: https://mutagen.readthedocs.io/en/latest/api/mp4.html#mutagen.mp4.MP4Tags
+        "TITLE": "\xa9nam",
+        "ALBUM": "\xa9alb",
+        "ARTIST": "\xa9ART",
+        "ALBUMARTIST": "aART"
+    },
 }
+
+# Regular expressions
 SYNCED_EXPR = re.compile(r"\[(\d{2}:\d{2}.\d{2})\](.*)")
 
 # Exceptions
@@ -64,7 +79,10 @@ class AudioFile():
 
     def get_tag(self, tag: str, as_string: bool = True) -> str | None:
         if isinstance(self.file, MP3):
-            tag = TAG_MAPPING.get(tag, tag)
+            tag = TAG_MAPPING["mp3"].get(tag, tag)
+
+        if isinstance(self.file, MP4):
+            tag = TAG_MAPPING["m4a"].get(tag, tag)
 
         if tag in self.file:
             field = self.file[tag]
@@ -72,7 +90,10 @@ class AudioFile():
 
     def set_tag(self, tag: str, value: str) -> None:
         if isinstance(self.file, MP3):
-            tag = TAG_MAPPING.get(tag, tag)
+            tag = TAG_MAPPING["mp3"].get(tag, tag)
+
+        if isinstance(self.file, MP4):
+            tag = TAG_MAPPING["m4a"].get(tag, tag)
 
         self.file[tag] = value
         self.file.save()
@@ -80,6 +101,9 @@ class AudioFile():
     def get_lyrics(self, language: str | None = None) -> str | None:
         if isinstance(self.file, FLAC):
             return self.get_tag("LYRICS")
+
+        if isinstance(self.file, MP4):
+            return self.get_tag("\xa9lyr")
 
         lyrics = None
         if language is not None:
@@ -106,6 +130,9 @@ class AudioFile():
                 raise ValueError
 
             return self.set_tag("LYRICS", lyrics)
+
+        if isinstance(self.file, MP4):
+            return self.set_tag("\xa9lyr", lyrics)
 
         if state == "synced" and isinstance(lyrics, str):
             lyrics = self.parse_lyrics(lyrics)
