@@ -25,6 +25,9 @@ lrcup embed lyrics.lrc track.flac
 # Search for lyrics and download them:
 lrcup search never gonna give you up
 
+# Search and download lyrics for a given folder:
+lrcup autosearch /mnt/music/
+
 # Search and embed lyrics for a given folder:
 lrcup autoembed /mnt/music/
 ```

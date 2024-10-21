@@ -163,6 +163,62 @@ def search(query: str) -> None:
 def version() -> None:
     click.echo(f"LRCUP v{__version__} (https://github.com/iiPythonx/lrcup)")
 
+@lrcup.command(help = "Automatically search and download lyrics for a folder")
+@click.argument("target", type = click.Path(exists = True, file_okay = False, path_type = Path))
+@click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics")
+def autosearch(target: Path, force: bool) -> None:
+    for file in target.rglob("*"):
+        if not (file.is_file() and file.suffix in CLASS_MAPPING):
+            continue
+
+        lrcfilename = f"{file.stem}.lrc"
+        lrcfilepath = file.parent / lrcfilename
+
+        try:
+            data = AudioFile(file)
+            artist, album, title = (
+                data.get_tag("ALBUMARTIST") or data.get_tag("ARTIST"),
+                data.get_tag("ALBUM"),
+                data.get_tag("TITLE"),
+            )
+
+            # I would use all() here but Ruff won't stop complaining
+            if not (artist and album and title):
+                click.secho(f"[/] Skipping {file} due to missing tags.", fg="yellow")
+                continue
+
+            if lrcfilepath.exists() and not force:
+                click.secho(
+                    f"[/] Skipping {title} on {album} by {artist}. {lrcfilename} already exists.",
+                    fg="yellow",
+                )
+                continue
+
+            # Perform lyrics search
+            results = lrclib.get(title, artist, album, round(data.length))
+            if not results:
+                click.secho(
+                    f"[-] No results found for {title} on {album} by {artist}", fg="red"
+                )
+                continue
+
+            lyrics = (results.get("syncedLyrics") or results.get("plainLyrics")) or ""
+            if not lyrics.strip():
+                click.secho(
+                    f"[-] No results found for {title} on {album} by {artist}", fg="red"
+                )
+                continue
+
+            with lrcfilepath.open("w+") as fh:
+                fh.write(lyrics)
+
+            click.secho(
+                f"[+] Fetched lyrics for {title} on {album} by {artist}. Lyrics written to '{lrcfilename}'.",
+                fg="green",
+            )
+        except Exception:
+            click.secho(f"[-] Failed to read tags from file '{file}'", fg="red")
+
 @lrcup.command(help = "Automatically search and embed lyrics for a folder")
 @click.argument("target", type = click.Path(exists = True, file_okay = False, path_type = Path))
 @click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics")
