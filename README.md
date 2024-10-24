@@ -29,7 +29,10 @@ lrcup search never gonna give you up
 lrcup autosearch /mnt/music/
 
 # Search and embed lyrics for a given folder:
-lrcup autoembed /mnt/music/
+lrcup autosearch --embed /mnt/music/
+
+# Search and embed lyrics for a given folder, also save lrc files:
+lrcup autosearch --embed --download /mnt/music/
 ```
 
 ## Module Usage
