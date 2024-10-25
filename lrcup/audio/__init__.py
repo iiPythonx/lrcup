@@ -116,7 +116,7 @@ class AudioFile():
 
         return str(lyrics) if lyrics else None
 
-    def set_lyrics(self, state: Literal["synced"] | Literal["unsynced"], lyrics: str | list, language: str = "XXX") -> None:
+    def set_lyrics(self, state: Literal["synced", "unsynced"], lyrics: str | list, language: str = "XXX") -> None:
         if self.type in [FLAC, MP4]:
             if isinstance(lyrics, list):
                 raise ValueError
