@@ -100,20 +100,4 @@ class LRCLib():
 
     def request_challenge(self) -> str:
         data = self.request("post", "request-challenge").json()
-
-        def verify_nonce(result, target) -> bool:
-            result_len = len(result)
-            if result_len != len(target):
-                return False
-
-            for i in range(result_len - 1):
-                if result[i] > target[i]:
-                    return False
-
-                elif result[i] < target[i]:
-                    break
-
-            return True
-
-        nonce = solve(data["prefix"], data["target"])
-        return f"{data['prefix']}:{nonce}"
+        return f"{data['prefix']}:{solve(data['prefix'], data['target'])}"
