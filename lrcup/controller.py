@@ -1,12 +1,24 @@
 # Copyright (c) 2024 iiPython
 
 # Modules
-from typing import Any, List, Dict
+import typing
 
 import requests
+from pydantic import BaseModel
 
 from . import __version__
 from .challenge import solve
+
+# Models
+class Track(BaseModel):
+    id:             int
+    trackName:      str
+    artistName:     str
+    albumName:      str
+    duration:       int
+    instrumental:   bool
+    plainLyrics:    str
+    syncedLyrics:   str
 
 # API Controller
 class LRCLib():
@@ -14,7 +26,7 @@ class LRCLib():
         self.session = requests.Session()
         self.api_url = f"{api_url.rstrip('/')}/"
 
-    def request(self, method: str, endpoint: str, headers: dict = {}, **kwargs) -> requests.Response:
+    def _request(self, method: str, endpoint: str, headers: dict = {}, **kwargs) -> requests.Response:
         headers = {
             "User-Agent": f"LRCUP v{__version__} (https://github.com/iiPythonx/lrcup)",
             **headers
@@ -25,54 +37,50 @@ class LRCLib():
             **kwargs
         )
 
-    def request_with_404(self, *args, **kwargs) -> dict | list | None:
-        resp = self.request(*args, **kwargs).json()
-        return None if resp.get("statusCode", 200) == 404 else resp
-
-    def search(
-        self,
-        query: str | None = None,
-        track: str | None = None,
-        artist: str | None = None,
-        album: str | None = None
-    ) -> List[Dict[str, Any]]:
-        return self.request("get", "search", params = {
-            "q": query,
-            "track_name": track,
-            "artist_name": artist,
-            "album_name": album
-        }).json()
-    
     def get(
         self,
         track: str,
         artist: str,
         album: str,
         duration: int
-    ) -> dict | None:
-        return self.request_with_404("get", "get", params = {
+    ) -> Track | None:
+        response = self._request("get", "get", params = {
             "track_name": track,
             "artist_name": artist,
             "album_name": album,
             "duration": duration
-        })
+        }).json()
+        if response.get("code", 200) == 404:
+            return None
 
-    def get_cached(
+        return Track(**response)
+
+    def get_by_id(self, record_id: int) -> Track | None:
+        response = self._request("get", f"get/{record_id}").json()
+        if response.get("code", 200) == 404:
+            return None
+
+        return Track(**response)
+
+    def search(
         self,
-        track: str,
-        artist: str,
-        album: str,
-        duration: int
-    ) -> dict | None:
-        return self.request_with_404("get", "get-cached", params = {
-            "track_name": track,
-            "artist_name": artist,
-            "album_name": album,
-            "duration": duration
-        })
+        query: typing.Optional[str] = None,
+        track: typing.Optional[str] = None,
+        artist: typing.Optional[str] = None,
+        album: typing.Optional[str] = None
+    ) -> list[Track]:
+        if not (query or track):
+            raise ValueError("Either query or track must be specified! Please see https://lrclib.net/docs.")
 
-    def get_by_id(self, id_: int) -> dict | None:
-        return self.request_with_404("get", f"get/{id_}")
+        return [
+            Track(**record)
+            for record in self._request("get", "search", params = {
+                "q": query,
+                "track_name": track,
+                "artist_name": artist,
+                "album_name": album
+            }).json()
+        ]
 
     def publish(
         self,
@@ -81,10 +89,10 @@ class LRCLib():
         artist: str,
         album: str,
         duration: int,
-        plain_lyrics: str = "",
-        synced_lyrics: str = ""
+        plain_lyrics: typing.Optional[str] = "",
+        synced_lyrics: typing.Optional[str] = ""
     ) -> bool:
-        return self.request(
+        return self._request(
             "post",
             "publish",
             headers = {"X-Publish-Token": token},
@@ -99,5 +107,5 @@ class LRCLib():
         ).status_code == 201
 
     def request_challenge(self) -> str:
-        data = self.request("post", "request-challenge").json()
+        data = self._request("post", "request-challenge").json()
         return f"{data['prefix']}:{solve(data['prefix'], data['target'])}"

@@ -138,14 +138,14 @@ def embed(lrc: Path, destination: Path) -> None:
 @click.argument("query", nargs = -1, required = True)
 def search(query: str) -> None:
     results = []
-    for i in lrclib.search(" ".join(query)):
-        if not (i["plainLyrics"] or i["syncedLyrics"]):
+    for item in lrclib.search(" ".join(query)):
+        if not (item.plainLyrics or item.syncedLyrics):
             continue  # Ignore instrumentals
 
-        results.append(i)
+        results.append(item)
 
-    for i, r in enumerate(results):
-        click.echo(f"{i + 1}) {r['artistName'].replace(';', ', ')} - {r['trackName']}")
+    for index, result in enumerate(results):
+        click.echo(f"{index + 1}) {result.artistName.replace(';', ', ')} - {result.trackName}")
 
     if not results:
         return click.secho("No search results found.", fg = "red")
@@ -157,10 +157,9 @@ def search(query: str) -> None:
             raise ValueError
 
         result = results[download_id - 1]
-        filename = f"{result['trackName']}.lrc"
-        with Path(filename).open("w+") as fh:
-            fh.write(result["syncedLyrics"] or result["plainLyrics"])
-            click.echo(f"Lyrics written to '{filename}'.")
+
+        Path(f"{result.trackName}.lrc").write_text(result.syncedLyrics or result.plainLyrics)
+        click.echo(f"Lyrics written to '{result.trackName}.lrc'.")
 
     except ValueError:
         click.secho("Invalid lyric result ID.", fg = "red")
@@ -230,15 +229,15 @@ def autosearch(target: Path, force: bool, embed: bool, download: bool) -> None:
                 else:
                     click.echo(f"[/] Fetching .lrc '{lrcfile.name}' for {title} on {album} by {artist}")
 
-                results = lrclib.get(title, artist, album, round(data.length))
-                if not results:
+                result = lrclib.get(title, artist, album, round(data.length))
+                if result is None:
                     click.secho(
                         f"[-] No results found for {title} on {album} by {artist}",
                         fg = "red"
                     )
                     continue
 
-                lyrics = (results.get("syncedLyrics") or results.get("plainLyrics")) or ""
+                lyrics = result.syncedLyrics or result.plainLyrics or ""
                 if not lyrics.strip():
                     click.secho(
                         f"[-] No results found for {title} on {album} by {artist}",
