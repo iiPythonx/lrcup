@@ -15,13 +15,13 @@ class Track(BaseModel):
     trackName:      str
     artistName:     str
     albumName:      str
-    duration:       int
+    duration:       int | float
     instrumental:   bool
-    plainLyrics:    str
-    syncedLyrics:   str
+    plainLyrics:    str | None
+    syncedLyrics:   str | None
 
 # API Controller
-class LRCLib():
+class LRCLib:
     def __init__(self, api_url: str = "https://lrclib.net/api/") -> None:
         self.session = requests.Session()
         self.api_url = f"{api_url.rstrip('/')}/"
@@ -50,14 +50,14 @@ class LRCLib():
             "album_name": album,
             "duration": duration
         }).json()
-        if response.get("code", 200) == 404:
+        if response.get("statusCode", 200) == 404:
             return None
 
         return Track(**response)
 
     def get_by_id(self, record_id: int) -> Track | None:
         response = self._request("get", f"get/{record_id}").json()
-        if response.get("code", 200) == 404:
+        if response.get("statusCode", 200) == 404:
             return None
 
         return Track(**response)
