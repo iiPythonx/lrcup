@@ -174,98 +174,62 @@ def version() -> None:
 
 @lrcup.command(help = "Automatically search and download lyrics for a folder")
 @click.argument("target", type = click.Path(exists = True, file_okay = False, path_type = Path))
-@click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics")
-@click.option("--embed", is_flag = True, show_default = True, default = False, help = "Do not save the downloaded lyrics to a separate file, embed them into the music file")
-@click.option("--download", is_flag = True, show_default = True, default = True, help = "Force download lrc file even with embed on")
+@click.option("--force", is_flag = True, show_default = True, default = False, help = "Force searching for lyrics even when they already exist")
+@click.option("--embed", is_flag = True, show_default = True, default = False, help = "Embed the lyrics into the original file, can be chained with --download")
+@click.option("--download", is_flag = True, show_default = True, default = False, help = "Download a LRC/TXT file with lyrics in it, can be chained with --embed")
 def autosearch(target: Path, force: bool, embed: bool, download: bool) -> None:
+    if not (embed or download):
+        return click.secho("[-] You must pass --embed or --download, otherwise there's nothing to do.", fg = "red")
+
     for file in target.rglob("*"):
         if not (file.is_file() and file.suffix in CLASS_MAPPING):
             continue
 
-        lrcfile = file.with_suffix(".lrc")
         try:
             data = AudioFile(file)
-            artist, album, title = (
+
+            # Handle field validation
+            fields = (
+                data.get_tag("TITLE"),
                 data.get_tag("ALBUMARTIST") or data.get_tag("ARTIST"),
                 data.get_tag("ALBUM"),
-                data.get_tag("TITLE"),
             )
-
-            # Check if we already have lyrics from somwhere
-            has_embedded = data.get_lyrics()
-            has_lrcfile = lrcfile.is_file()
-
-            # I would use all() here but Ruff won't stop complaining
-            if not (artist and album and title):
-                click.secho(f"[/] Skipping {file} due to missing tags.", fg = "yellow")
+            if not all(fields):
+                print(f"[/] Skipping '{file}' due to missing tags.")
                 continue
 
-            synced, lyrics = False, None
-            if not force:
-                if download and has_embedded and not has_lrcfile:
-                    click.secho(f"[/] Extracting {title} on {album} by {artist} from '{file.name}' to '{lrcfile.name}'")
-                    lyrics = data.get_lyrics()
+            artist, album, title = fields
 
-                elif embed and not has_embedded and has_lrcfile:
-                    click.secho(f"[/] Embedding lyrics to '{file.name}' {title} on {album} by {artist} from '{lrcfile.name}'")
-                    lyrics = lrcfile.read_text(encoding = "utf-8")
+            # Handle force flag
+            if (data.get_lyrics() or file.with_suffix(".txt").is_file() or file.with_suffix(".lrc").is_file()) and not force:
+                # print(f"[/] Skipping '{file}' because it already has lyrics present.")
+                continue
 
-                if lyrics:
-                    plain_lyrics, synced_lyrics = process_lyrics(lyrics)
-                    synced, lyrics = synced_lyrics is not None, synced_lyrics or plain_lyrics
+            # Fetch actual lyrics
+            result = lrclib.get(*fields, round(data.length))  # pyright: ignore
+            if result is None:
+                click.secho(f"[-] No lyrics found for '{file}'.", fg = "red")
+                continue
 
-                # Skip file if we have what we want
-                if (not embed or has_embedded) and (not download or has_lrcfile):
-                    click.secho(f"[/] Skipping {title} on {album} by {artist}, lyrics already exist.", fg = "yellow")
-                    continue
+            extension = "lrc" if result.syncedLyrics else "txt"
+            if not (result.syncedLyrics or result.plainLyrics or "").strip():
+                click.secho(f"[-] No lyrics found for '{file}'.", fg = "red")
+                continue
 
-            # Perform lyrics search
-            if not lyrics:
-                if embed and download:
-                    click.echo(f"[/] Fetching .lrc '{lrcfile.name}' and embedding lyrics to '{file.name}' for {title} on {album} by {artist}")
+            # Handle saving lyrics
+            print(f"[+] Saving lyrics for '{file}'")
+            if embed:
+                data.set_lyrics("synced" if extension == "lrc" else "unsynced", result.syncedLyrics or result.plainLyrics)  # pyright: ignore | Line 215 fixes this.
+                click.secho("    .. Saved lyrics to file metadata!", fg = "green")
+            
+            if download:
+                destination = file.with_suffix(f".{extension}")
+                destination.write_text(result.syncedLyrics or result.plainLyrics, encoding = "utf-8")  # pyright: ignore | Line 215 fixes this.
 
-                elif embed:
-                    click.echo(f"[/] Embedding lyrics to '{file.name}' for {title} on {album} by {artist}")
-
-                else:
-                    click.echo(f"[/] Fetching .lrc '{lrcfile.name}' for {title} on {album} by {artist}")
-
-                result = lrclib.get(title, artist, album, round(data.length))
-                if result is None:
-                    click.secho(
-                        f"[-] No results found for {title} on {album} by {artist}",
-                        fg = "red"
-                    )
-                    continue
-
-                lyrics = result.syncedLyrics or result.plainLyrics or ""
-                if not lyrics.strip():
-                    click.secho(
-                        f"[-] No results found for {title} on {album} by {artist}",
-                        fg = "red"
-                    )
-                    continue
-
-            if embed and (not has_embedded or force):
-                data.set_lyrics("synced" if synced else "unsynced", lyrics)
-
-            if download and (not has_lrcfile or force):
-                lrcfile.write_text(lyrics, encoding = "utf-8")
-
-            success_msg = f"[+] Fetched lyrics for {title} on {album} by {artist}. "
-            if embed and download:
-                success_msg += f"Embedded lyrics to '{file.name}' and wrote .lrc file '{lrcfile.name}'"
-
-            elif embed:
-                success_msg += f"Embedded lryics to '{file.name}'"
-
-            else:
-                success_msg += f"Wrote lyrics to .lrc file '{lrcfile.name}'"
-
-            click.secho(success_msg, fg = "green")
+                click.secho(f"    .. Saved lyrics to '{destination.name}'!", fg = "green")
 
         except Exception:
-            click.secho(f"[-] Failed to read tags from file '{file}'", fg = "red")
+            click.secho(f"[-] Failed to read tags from file '{file}'.", fg = "red")
 
 @lrcup.command(
     help = "Apply a time offset to a specified LRC file or audio file.",

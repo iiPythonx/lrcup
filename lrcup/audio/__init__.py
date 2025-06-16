@@ -42,7 +42,7 @@ class UnsupportedSuffix(ValueError):
     pass
 
 # Audio handler
-class AudioFile():
+class AudioFile:
     def __init__(self, path: Path) -> None:
         self.path = path
         if path.suffix not in CLASS_MAPPING:
