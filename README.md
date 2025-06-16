@@ -25,9 +25,6 @@ lrcup embed lyrics.lrc track.flac
 # Search for lyrics and download them:
 lrcup search never gonna give you up
 
-# Search and download lyrics for a given folder:
-lrcup autosearch /mnt/music/
-
 # Search and embed lyrics for a given folder:
 lrcup autosearch --embed /mnt/music/
 
@@ -50,7 +47,7 @@ results = lrclib.search(
     track = "Never Gonna Give You Up",
     artist = "Rick Astley"
 )
-print(results[0]["syncedLyrics"])
+print(results[0].syncedLyrics)
 
 # Fetch synced lyrics directly
 track = lrclib.get(
@@ -60,7 +57,7 @@ track = lrclib.get(
     duration = 215
 )
 if track is not None:
-    print(track["syncedLyrics"])
+    print(track.syncedLyrics)
 
 # Publish synced lyrics
 lrclib.publish(
