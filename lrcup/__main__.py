@@ -1,4 +1,4 @@
-# Copyright (c) 2024 iiPython
+# Copyright (c) 2024-2025 iiPython
 
 # Modules
 import sys
@@ -158,8 +158,9 @@ def search(query: str) -> None:
 
         result = results[download_id - 1]
 
-        Path(f"{result.trackName}.lrc").write_text(result.syncedLyrics or result.plainLyrics)
-        click.echo(f"Lyrics written to '{result.trackName}.lrc'.")
+        output_file = Path(f"{result.trackName}.{'lrc' if result.syncedLyrics else 'txt'}")
+        output_file.write_text(result.syncedLyrics or result.plainLyrics)
+        click.echo(f"Lyrics written to '{output_file.name}'.")
 
     except ValueError:
         click.secho("Invalid lyric result ID.", fg = "red")
