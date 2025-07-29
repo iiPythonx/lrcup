@@ -1,4 +1,4 @@
-# Copyright (c) 2024 iiPython
+# Copyright (c) 2024-2025 iiPython
 
 # Modules
 import re
@@ -9,13 +9,15 @@ from typing import Literal
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
 from mutagen.mp4 import MP4
+from mutagen.oggopus import OggOpus
 from mutagen.id3._frames import USLT, SYLT
 
 # Initialization
 CLASS_MAPPING = {
     ".mp3": MP3,
     ".flac": FLAC,
-    ".m4a": MP4
+    ".m4a": MP4,
+    ".opus": OggOpus
 }
 
 # Tag Mapping based on FileType
@@ -26,12 +28,12 @@ TAG_MAPPING = {
         "ARTIST": "TPE1",
         "ALBUMARTIST": "TPE2"
     },
-    MP4: { # reference: https://mutagen.readthedocs.io/en/latest/api/mp4.html#mutagen.mp4.MP4Tags
+    MP4: {  # reference: https://mutagen.readthedocs.io/en/latest/api/mp4.html#mutagen.mp4.MP4Tags
         "TITLE": "\xa9nam",
         "ALBUM": "\xa9alb",
         "ARTIST": "\xa9ART",
         "ALBUMARTIST": "aART"
-    },
+    }
 }
 
 # Regular expressions
@@ -84,7 +86,14 @@ class AudioFile:
 
         if tag in self.file:
             field = self.file[tag]
-            return field[0] if isinstance(field, list) else (str(field) if as_string else field)
+
+            # Handle field data
+            field = field[0] if isinstance(field, list) else (str(field) if as_string else field)
+            if tag.lower() in ["artist", "albumartist"] and ";" in field:
+                print(f"\n  Notice: the tags on this file may be incorrect as {tag} contains at least one semicolon (;) separated string.")
+                print(f"  To fix this, please split {tag} into multiple values using something like Picard.\n")
+
+            return field
 
     def set_tag(self, tag: str, value: str) -> None:
         if self.type in TAG_MAPPING:
@@ -94,8 +103,8 @@ class AudioFile:
         self.file.save()
 
     def get_lyrics(self, language: str | None = None) -> str | None:
-        if self.type in [FLAC, MP4]:
-            return self.get_tag("LYRICS" if self.type == FLAC else "\xa9lyr")
+        if self.type in [FLAC, MP4, OggOpus]:
+            return self.get_tag("LYRICS" if self.type in [FLAC, OggOpus] else "\xa9lyr")
 
         lyrics = None
         if language is not None:
@@ -117,11 +126,11 @@ class AudioFile:
         return str(lyrics) if lyrics else None
 
     def set_lyrics(self, state: Literal["synced", "unsynced"], lyrics: str | list, language: str = "XXX") -> None:
-        if self.type in [FLAC, MP4]:
+        if self.type in [FLAC, MP4, OggOpus]:
             if isinstance(lyrics, list):
                 raise ValueError
 
-            return self.set_tag("LYRICS" if self.type == FLAC else "\xa9lyr", lyrics)
+            return self.set_tag("LYRICS" if self.type in [FLAC, OggOpus] else "\xa9lyr", lyrics)
 
         if state == "synced" and isinstance(lyrics, str):
             lyrics = self.parse_lyrics(lyrics)
