@@ -1,8 +1,6 @@
 name: Publish to PyPI
 on:
   push:
-
-    # This is temporary, I don't want to use GH Releases rn
     paths: ["lrcup/__init__.py", "pyproject.toml"]
 
   workflow_dispatch:
@@ -20,15 +18,19 @@ jobs:
       id-token: write
     steps:
     - uses: actions/checkout@v4
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: "0.8.4"
+        enable-cache: true
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
-        cache: "pip"
+        python-version: "3.13"
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e . hatch
+      run:
+        uv sync --locked
+        uv pip install hatch
     - name: Build package
       run: hatch build
     - name: Publish to PyPI
