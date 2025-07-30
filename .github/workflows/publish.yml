@@ -28,7 +28,7 @@ jobs:
       with:
         python-version: "3.13"
     - name: Install dependencies
-      run:
+      run: |
         uv sync --locked
         uv pip install hatch
     - name: Build package
