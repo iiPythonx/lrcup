@@ -32,6 +32,6 @@ jobs:
         uv sync --locked
         uv pip install hatch
     - name: Build package
-      run: hatch build
+      run: uv run hatch build
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
