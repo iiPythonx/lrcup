@@ -1,4 +1,4 @@
-# Copyright (c) 2024 iiPython
+# Copyright (c) 2024-2025 iiPython
 
 # Modules
 import typing
