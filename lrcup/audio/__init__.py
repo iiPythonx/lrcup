@@ -37,7 +37,7 @@ TAG_MAPPING = {
 }
 
 # Regular expressions
-SYNCED_EXPR = re.compile(r"\[(\d{2}:\d{2}.\d{2})\](.*)")
+SYNCED_EXPR = re.compile(r"\[(\d{2}:\d{2}.\d{2,3})\](.*)")
 
 # Exceptions
 class UnsupportedSuffix(ValueError):
